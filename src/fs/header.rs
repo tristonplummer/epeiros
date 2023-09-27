@@ -47,6 +47,20 @@ impl Header {
         Self::deserialize(&mut src)
     }
 
+    /// Recursively gets the path to all nodes in the header.
+    pub fn get_all_node_paths(&self) -> Vec<String> {
+        let mut paths = Vec::new();
+        for inode in &self.root.nodes {
+            paths.push(inode.name.clone());
+        }
+
+        for subdir in &self.root.subdirectories {
+            paths.extend(subdir.node_paths());
+        }
+
+        paths
+    }
+
     pub fn get_inode<T>(&self, virtual_path: &T) -> Option<&Inode>
     where
         T: AsRef<str>,
@@ -139,6 +153,18 @@ impl Header {
     }
 }
 
+impl Default for Header {
+    fn default() -> Self {
+        let root = VirtualDirectory {
+            name: "data".to_owned(),
+            subdirectories: Vec::new(),
+            nodes: Vec::new(),
+        };
+
+        Self { root }
+    }
+}
+
 impl VirtualDirectory {
     fn get_subdirectory(&mut self, name: &str) -> Option<&mut VirtualDirectory> {
         self.subdirectories
@@ -165,6 +191,22 @@ impl VirtualDirectory {
             nodes: Vec::new(),
         };
         self.subdirectories.push(subdirectory);
+    }
+
+    fn node_paths(&self) -> Vec<String> {
+        let mut paths = Vec::with_capacity(self.nodes.len());
+        for inode in &self.nodes {
+            paths.push(format!("{}/{}", &self.name, inode.name));
+        }
+
+        for subdir in &self.subdirectories {
+            let child_nodes = subdir.node_paths();
+            for inode in &child_nodes {
+                paths.push(format!("{}/{}", &self.name, inode));
+            }
+        }
+
+        paths
     }
 }
 
@@ -249,9 +291,11 @@ impl Serialize for Header {
     where
         T: Write + WriteBytesExt,
     {
+        let inode_qty = self.get_all_node_paths().len();
+
         dst.write_string(SAH_MAGIC_VALUE, 3)?;
         dst.write_u32::<byteorder::LittleEndian>(HEADER_FORMAT_VERSION)?;
-        dst.write_u32::<byteorder::LittleEndian>(10)?;
+        dst.write_u32::<byteorder::LittleEndian>(inode_qty as u32)?;
         let padding = vec![0; 40];
         dst.write_all(&padding)?;
         self.root.versioned_serialize(dst, version)?;

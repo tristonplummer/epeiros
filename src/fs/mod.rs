@@ -8,7 +8,9 @@ use std::path::Path;
 pub mod header;
 pub mod types;
 
-trait ReadableStorage {
+pub trait ReadableStorage {
+    fn all_node_paths(&self) -> Vec<String>;
+
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>;
@@ -41,8 +43,13 @@ trait ReadableStorage {
     }
 }
 
-trait WritableStorage {
-    fn write<T>(&mut self, virtual_path: T, data: &[u8]) -> Result<(), std::io::Error>
+pub trait WritableStorage {
+    fn write<T>(
+        &mut self,
+        virtual_path: T,
+        data: &[u8],
+        serialize_header: bool,
+    ) -> Result<(), std::io::Error>
     where
         T: AsRef<str>;
 
@@ -69,7 +76,7 @@ trait WritableStorage {
         let mut dst = Vec::new();
         typ.versioned_serialize(&mut dst, version)?;
 
-        self.write(virtual_path, &dst)
+        self.write(virtual_path, &dst, true)
     }
 }
 
@@ -99,6 +106,10 @@ impl ImmutableFilestore {
 }
 
 impl ReadableStorage for ImmutableFilestore {
+    fn all_node_paths(&self) -> Vec<String> {
+        self.header.get_all_node_paths()
+    }
+
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>,
@@ -132,6 +143,23 @@ impl MutableFilestore {
         })
     }
 
+    pub fn create<P>(header_path: P, data_path: P) -> Result<Self, HeaderDeserializeError>
+    where
+        P: AsRef<Path>,
+    {
+        let header_path = header_path.as_ref();
+        let data_path = data_path.as_ref();
+
+        let header_file = File::create(header_path)?;
+        let data_file = File::create(data_path)?;
+
+        Ok(Self {
+            header_file,
+            header: Header::default(),
+            data_file,
+        })
+    }
+
     fn serialize_header(&mut self) -> Result<(), std::io::Error> {
         let mut dst = Vec::with_capacity(4_000_000);
         self.header.serialize(&mut dst)?;
@@ -140,9 +168,26 @@ impl MutableFilestore {
         self.header_file.write_all(&dst)?;
         Ok(())
     }
+
+    pub fn patch(&mut self, other: &mut impl ReadableStorage) -> Result<(), Error> {
+        let other_nodes = other.all_node_paths();
+        for node in &other_nodes {
+            let data = other
+                .read(node)
+                .expect("failed to read known node in other storage");
+            self.write(node, &data, false)?;
+        }
+
+        self.serialize_header()?;
+        Ok(())
+    }
 }
 
 impl ReadableStorage for MutableFilestore {
+    fn all_node_paths(&self) -> Vec<String> {
+        self.header.get_all_node_paths()
+    }
+
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>,
@@ -168,7 +213,12 @@ impl ReadableStorage for MutableFilestore {
 }
 
 impl WritableStorage for MutableFilestore {
-    fn write<T>(&mut self, virtual_path: T, data: &[u8]) -> Result<(), Error>
+    fn write<T>(
+        &mut self,
+        virtual_path: T,
+        data: &[u8],
+        serialize_header: bool,
+    ) -> Result<(), Error>
     where
         T: AsRef<str>,
     {
@@ -189,7 +239,10 @@ impl WritableStorage for MutableFilestore {
                 self.data_file.set_len(offset + (inode.length as u64))?;
                 self.data_file.write_all(data)?;
             }
-            self.serialize_header()?;
+            if serialize_header {
+                self.serialize_header()?;
+            }
+
             return Ok(());
         }
 
@@ -207,7 +260,10 @@ impl WritableStorage for MutableFilestore {
         self.data_file.write_all(data)?;
 
         self.header.emplace_node(virtual_path, inode)?;
-        self.serialize_header()?;
+
+        if serialize_header {
+            self.serialize_header()?;
+        }
 
         Ok(())
     }
@@ -216,7 +272,7 @@ impl WritableStorage for MutableFilestore {
 #[cfg(test)]
 mod tests {
     use crate::fs::types::{ItemData, SkillData};
-    use crate::fs::{ImmutableFilestore, MutableFilestore, ReadableStorage, WritableStorage};
+    use crate::fs::{ImmutableFilestore, MutableFilestore, ReadableStorage};
     use crate::io::{Deserialize, GameVersion, Serialize};
     use std::io::Cursor;
 
@@ -262,7 +318,7 @@ mod tests {
 
     #[test]
     fn sdata_read() {
-        let mut indata = std::fs::read("res/Skill.SData").unwrap();
+        let indata = std::fs::read("res/Skill.SData").unwrap();
         let mut src = Cursor::new(indata.as_slice());
         let sdata = SkillData::versioned_deserialize(&mut src, GameVersion::Ep6).unwrap();
 
@@ -287,12 +343,9 @@ mod tests {
     }
 
     #[test]
-    fn item_ser_test() {
-        let kreon = std::fs::read_to_string("res/kreonitems.json").unwrap();
-        let data: ItemData = serde_json::from_str(&kreon).unwrap();
-
-        let mut fs = MutableFilestore::open("res/data.sah", "res/data.saf").unwrap();
-        fs.write_versioned_type("itemx/lol/item.sdata", &data, GameVersion::Ep6v2)
-            .unwrap();
+    fn patch_test() {
+        let mut fs = ImmutableFilestore::open("res/data.sah", "res/data.saf").unwrap();
+        let mut new = MutableFilestore::create("res/new.sah", "res/new.saf").unwrap();
+        new.patch(&mut fs).unwrap();
     }
 }
