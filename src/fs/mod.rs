@@ -94,12 +94,12 @@ mod tests {
         let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
             .expect("failed to open filestore");
 
-        let data = std::fs::read("res/Skill.in.SData").unwrap();
+        let data = std::fs::read("res/Skill.ep7.SData").unwrap();
         let mut src = Cursor::new(data.as_slice());
         let sdata = SkillData::versioned_deserialize(&mut src, GameVersion::Ep6).unwrap();
 
         std::fs::write(
-            "res/skills_ep6v3.json",
+            "res/skills_ep7.json",
             serde_json::to_vec_pretty(&sdata).unwrap(),
         )
         .unwrap();

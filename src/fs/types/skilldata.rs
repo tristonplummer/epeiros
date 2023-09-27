@@ -13,9 +13,10 @@ pub struct SkillRecord {
     description: String,
     rank: u8,
     icon: u16,
-    animation: u8,
-    id: u32,
-    effect: Option<u8>,
+    animation: u16,
+    effect: u8,
+    toggle_type: u8,
+    sound: u16,
     min_level: u16,
     country: u8,
     usable_by_fighter: bool,
@@ -147,13 +148,14 @@ impl Deserialize for SkillRecord {
         let description = src.read_length_prefixed_string()?;
         let rank = src.read_u8()?;
         let icon = src.read_u16::<LE>()?;
-        let animation = src.read_u8()?;
-        let id = src.read_u32::<LE>()?;
+        let animation = src.read_u16::<LE>()?;
         let effect = if version >= GameVersion::Ep6 {
-            Some(src.read_u8()?)
+            src.read_u8()?
         } else {
-            None
+            0
         };
+        let toggle_type = src.read_u8()?;
+        let sound = src.read_u16::<LE>()?;
 
         let min_level = src.read_u16::<LE>()?;
         let country = src.read_u8()?;
@@ -257,10 +259,11 @@ impl Deserialize for SkillRecord {
             name,
             description,
             rank,
-            id,
             animation,
             icon,
             effect,
+            toggle_type,
+            sound,
             min_level,
             country,
             usable_by_fighter,
@@ -399,11 +402,12 @@ impl Serialize for SkillRecord {
         dst.write_length_prefixed_string(&self.description)?;
         dst.write_u8(self.rank)?;
         dst.write_u16::<LE>(self.icon)?;
-        dst.write_u8(self.animation)?;
-        dst.write_u32::<LE>(self.id)?;
+        dst.write_u16::<LE>(self.animation)?;
         if version >= GameVersion::Ep6 {
-            dst.write_u8(self.effect.unwrap_or_default())?;
+            dst.write_u8(self.effect)?;
         }
+        dst.write_u8(self.toggle_type)?;
+        dst.write_u16::<LE>(self.sound)?;
         dst.write_u16::<LE>(self.min_level)?;
         dst.write_u8(self.country)?;
         dst.write_bool(self.usable_by_fighter)?;

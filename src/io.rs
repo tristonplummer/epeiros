@@ -118,7 +118,6 @@ where
     where
         T: AsRef<str>,
     {
-        println!("{}", length);
         let mut dst = vec![0; length];
         let bytes = text.as_ref().as_bytes();
         dst[..bytes.len()].copy_from_slice(bytes);
