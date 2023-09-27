@@ -62,3 +62,164 @@ fn is_encrypted(buf: &[u8]) -> bool {
 
     String::from_utf8_lossy(&buf[..SEED_SIGNATURE.len()]).eq(SEED_SIGNATURE)
 }
+
+macro_rules! user_type {
+    ($typ:ty) => {
+        $typ
+    };
+}
+
+macro_rules! user_type_readable {
+    ($src:ident, $version:ident, u8 $if:expr) => {
+        if $if($version) {
+            $src.read_u8()?
+        } else {
+            0
+        }
+    };
+    ($src:ident, $version:ident, u8) => {
+        $src.read_u8()?
+    };
+    ($src:ident, $version:ident, bool) => {
+        1 == $src.read_u8()?
+    };
+    ($src:ident, $version:ident, bool $if:expr) => {
+        if $if($version) {
+            1 == $src.read_u8()?
+        } else {
+            false
+        }
+    };
+    ($src:ident, $version:ident, u16) => {
+        $src.read_u16::<byteorder::LittleEndian>()?
+    };
+    ($src:ident, $version:ident, u16 $if:expr) => {
+        if $if($version) {
+            $src.read_u16::<byteorder::LittleEndian>()?
+        } else {
+            0
+        }
+    };
+    ($src:ident, $version:ident, String) => {
+        $src.read_length_prefixed_string()?
+    };
+    ($src:ident, $version:ident, String $if:expr) => {
+        if $if($version) {
+            $src.read_length_prefixed_string()?
+        } else {
+            String::new()
+        }
+    };
+    ($src:ident, $version:ident, Vec <$inner:ident> $len:expr) => {{
+        let length = $len($version);
+        let mut vec = Vec::with_capacity(length);
+        for _ in 0..length {
+            let inner = $inner::versioned_deserialize($src, $version)?;
+            vec.push(inner);
+        }
+        vec
+    }};
+}
+
+macro_rules! user_type_writeable {
+    ($dst:ident, $version:ident, u8 $value:expr, $if:expr) => {
+        if $if($version) {
+            $dst.write_u8(*$value)?
+        }
+    };
+    ($dst:ident, $version:ident, u8 $value:expr) => {
+        $dst.write_u8(*$value)?
+    };
+    ($dst:ident, $version:ident, bool $value:expr) => {
+        $dst.write_u8(if *$value { 1 } else { 0 })?
+    };
+    ($dst:ident, $version:ident, bool $value:expr, $if:expr) => {
+        if $if($version) {
+            $dst.write_u8(if *$value { 1 } else { 0 })?
+        }
+    };
+    ($dst:ident, $version:ident, u16 $value:expr) => {
+        $dst.write_u16::<byteorder::LittleEndian>(*$value)?
+    };
+    ($dst:ident, $version:ident, u16 $value:expr, $if:expr) => {
+        $if($version) {
+            $dst.write_u16::<byteorder::LittleEndian>(*$value)?
+        }
+    };
+    ($dst:ident, $version:ident, String $value:expr) => {
+        $dst.write_length_prefixed_string($value)?
+    };
+    ($dst:ident, $version:ident, String $value:expr, $if:expr) => {
+        if $if($version) {
+            $dst.write_length_prefixed_string($value)?
+        }
+    };
+    ($dst:ident, $version:ident, Vec <$inner:ident> $value:expr, $len:expr) => {{
+        let length = $len($version);
+        for idx in 0..length {
+            if idx >= $value.len() {
+                let default = $inner::default();
+                default.versioned_serialize($dst, $version)?;
+            } else {
+                $value[idx].versioned_serialize($dst, $version)?;
+            }
+        }
+    }};
+}
+
+macro_rules! sdata_record {
+    (
+        $ident:ident {
+            $(
+                $field:ident $typ:ident $(<$generics:ident>)?
+                $(if($if:expr))?
+                $(len($len:expr))?
+            );* $(;)?
+        }
+    ) => {
+        #[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
+        pub struct $ident {
+            $(
+                pub $field: user_type!($typ $(<$generics>)?),
+            )*
+        }
+
+        impl $crate::io::Deserialize for $ident {
+            type Error = std::io::Error;
+
+            #[allow(unused_variables)]
+            fn versioned_deserialize<T>(src: &mut T, version: GameVersion) -> Result<Self, Self::Error>
+            where
+                T: Read + ReadBytesExt,
+                Self: Sized
+            {
+                $(
+                    let $field = user_type_readable!(src, version, $typ $(<$generics>)? $($if)? $($len)?);
+                )*
+
+                Ok(Self {
+                    $(
+                        $field,
+                    )*
+                })
+            }
+        }
+
+        impl $crate::io::Serialize for $ident {
+            type Error = std::io::Error;
+
+            #[allow(unused_variables)]
+            fn versioned_serialize<T>(&self, dst: &mut T, version: GameVersion) -> Result<(), Self::Error>
+            where
+                T: Write + WriteBytesExt
+            {
+                $(
+                    user_type_writeable!(dst, version, $typ $(<$generics>)? &self.$field$(,$if)? $(,$len)?);
+                )*
+                Ok(())
+            }
+        }
+    };
+}
+
+pub(crate) use {sdata_record, user_type, user_type_readable, user_type_writeable};

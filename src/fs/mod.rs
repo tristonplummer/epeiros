@@ -93,23 +93,16 @@ mod tests {
     fn sdata_write() {
         let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
             .expect("failed to open filestore");
-
-        let data = std::fs::read("res/Skill.ep7.SData").unwrap();
-        let mut src = Cursor::new(data.as_slice());
-        let sdata = SkillData::versioned_deserialize(&mut src, GameVersion::Ep6).unwrap();
-
-        std::fs::write(
-            "res/skills_ep7.json",
-            serde_json::to_vec_pretty(&sdata).unwrap(),
-        )
-        .unwrap();
-
-        let mut dst = Vec::new();
-        sdata
-            .versioned_serialize(&mut dst, GameVersion::Ep6)
+        let character_skills = fs
+            .read_versioned_type::<SkillData>("character/skill.sdata", GameVersion::Ep6)
             .unwrap();
 
-        std::fs::write("res/Skill.SData", &dst).expect("");
+        let mut out = Vec::new();
+        character_skills
+            .versioned_serialize(&mut out, GameVersion::Ep6)
+            .unwrap();
+
+        std::fs::write("res/Skill.SData", &out).unwrap();
     }
 
     #[test]
