@@ -14,9 +14,9 @@ pub struct Header {
 }
 
 pub struct VirtualDirectory {
-    name: String,
-    subdirectories: Vec<VirtualDirectory>,
-    nodes: Vec<Inode>,
+    pub name: String,
+    pub subdirectories: Vec<VirtualDirectory>,
+    pub nodes: Vec<Inode>,
 }
 
 pub struct Inode {
@@ -47,7 +47,7 @@ impl Header {
         Self::deserialize(&mut src)
     }
 
-    pub fn get_inode<T>(&self, virtual_path: T) -> Option<&Inode>
+    pub fn get_inode<T>(&self, virtual_path: &T) -> Option<&Inode>
     where
         T: AsRef<str>,
     {
@@ -81,7 +81,7 @@ impl Header {
         None
     }
 
-    pub fn get_inode_mut<T>(&mut self, virtual_path: T) -> Option<&mut Inode>
+    pub fn get_inode_mut<T>(&mut self, virtual_path: &T) -> Option<&mut Inode>
     where
         T: AsRef<str>,
     {
@@ -91,13 +91,12 @@ impl Header {
         let mut directory = &mut self.root;
         while parts.len() > 1 {
             let name = parts.pop_front().expect("failed to pop directory path");
-            match directory
-                .subdirectories
-                .iter_mut()
-                .find(|sub| sub.name.eq_ignore_ascii_case(name))
-            {
-                Some(sub) => directory = sub,
-                None => return None,
+            if directory.subdirectory_exists(name) {
+                directory = directory
+                    .get_subdirectory(name)
+                    .expect("failed to get known existing subdirectory");
+            } else {
+                return None;
             }
         }
 
@@ -113,6 +112,59 @@ impl Header {
         }
 
         None
+    }
+
+    pub fn emplace_node<T>(&mut self, virtual_path: T, node: Inode) -> Result<(), std::io::Error>
+    where
+        T: AsRef<str>,
+    {
+        let virtual_path = virtual_path.as_ref();
+        let mut parts = virtual_path.split('/').collect::<VecDeque<_>>();
+
+        let mut directory = &mut self.root;
+        while parts.len() > 1 {
+            let name = parts.pop_front().expect("failed to pop directory path");
+            if directory.subdirectory_exists(name) {
+                directory = directory
+                    .get_subdirectory(name)
+                    .expect("failed to get known existing subdirectory");
+            } else {
+                directory = directory.create_and_get_subdirectory(name);
+            }
+        }
+
+        assert_eq!(parts.len(), 1);
+        directory.nodes.push(node);
+        Ok(())
+    }
+}
+
+impl VirtualDirectory {
+    fn get_subdirectory(&mut self, name: &str) -> Option<&mut VirtualDirectory> {
+        self.subdirectories
+            .iter_mut()
+            .find(|s| s.name.eq_ignore_ascii_case(name))
+    }
+
+    fn subdirectory_exists(&self, name: &str) -> bool {
+        self.subdirectories
+            .iter()
+            .any(|s| s.name.eq_ignore_ascii_case(name))
+    }
+
+    fn create_and_get_subdirectory(&mut self, name: &str) -> &mut VirtualDirectory {
+        self.create_subdirectory(name);
+        self.get_subdirectory(name)
+            .expect("failed to get previously created subdirectory")
+    }
+
+    fn create_subdirectory(&mut self, name: &str) {
+        let subdirectory = VirtualDirectory {
+            name: name.to_string(),
+            subdirectories: Vec::new(),
+            nodes: Vec::new(),
+        };
+        self.subdirectories.push(subdirectory);
     }
 }
 
@@ -201,7 +253,7 @@ impl Serialize for Header {
         dst.write_u32::<byteorder::LittleEndian>(HEADER_FORMAT_VERSION)?;
         dst.write_u32::<byteorder::LittleEndian>(10)?;
         let padding = vec![0; 40];
-        dst.write(&padding)?;
+        dst.write_all(&padding)?;
         self.root.versioned_serialize(dst, version)?;
         dst.write_u64::<byteorder::LittleEndian>(0)?;
         Ok(())

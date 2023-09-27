@@ -1,9 +1,9 @@
-use crate::fs::header::{Header, HeaderDeserializeError};
+use crate::fs::header::{Header, HeaderDeserializeError, Inode};
 use crate::io::{Deserialize, GameVersion, Serialize};
 use memmap2::Mmap;
 use std::fs::{File, OpenOptions};
 use std::io::{Cursor, Error, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub mod header;
 pub mod types;
@@ -103,7 +103,7 @@ impl ReadableStorage for ImmutableFilestore {
     where
         T: AsRef<str>,
     {
-        if let Some(node) = self.header.get_inode(virtual_path) {
+        if let Some(node) = self.header.get_inode(&virtual_path) {
             let end_offset = node.offset + node.length;
             let slice = &self.data_file[node.offset..end_offset];
             return Some(Vec::from(slice));
@@ -147,8 +147,12 @@ impl ReadableStorage for MutableFilestore {
     where
         T: AsRef<str>,
     {
-        if let Some(node) = self.header.get_inode(virtual_path) {
-            if let Err(_) = self.data_file.seek(SeekFrom::Start(node.offset as u64)) {
+        if let Some(node) = self.header.get_inode(&virtual_path) {
+            if self
+                .data_file
+                .seek(SeekFrom::Start(node.offset as u64))
+                .is_err()
+            {
                 return None;
             }
 
@@ -168,7 +172,7 @@ impl WritableStorage for MutableFilestore {
     where
         T: AsRef<str>,
     {
-        if let Some(inode) = self.header.get_inode_mut(virtual_path) {
+        if let Some(inode) = self.header.get_inode_mut(&virtual_path) {
             let existing_space = inode.length;
             let can_fit_into_existing_space = data.len() <= existing_space;
             inode.length = data.len();
@@ -188,6 +192,22 @@ impl WritableStorage for MutableFilestore {
             self.serialize_header()?;
             return Ok(());
         }
+
+        let virtual_path = virtual_path.as_ref();
+        let name = virtual_path.split('/').last().unwrap();
+        let offset = self.data_file.seek(SeekFrom::End(0))?;
+        let inode = Inode {
+            name: name.to_owned(),
+            offset: offset as usize,
+            length: data.len(),
+            checksum: 0,
+        };
+
+        self.data_file.set_len(offset + (inode.length as u64))?;
+        self.data_file.write_all(data)?;
+
+        self.header.emplace_node(virtual_path, inode)?;
+        self.serialize_header()?;
 
         Ok(())
     }
@@ -272,7 +292,7 @@ mod tests {
         let data: ItemData = serde_json::from_str(&kreon).unwrap();
 
         let mut fs = MutableFilestore::open("res/data.sah", "res/data.saf").unwrap();
-        fs.write_versioned_type("item/item.sdata", &data, GameVersion::Ep6v2)
+        fs.write_versioned_type("itemx/lol/item.sdata", &data, GameVersion::Ep6v2)
             .unwrap();
     }
 }
