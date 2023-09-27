@@ -32,7 +32,7 @@ sdata_record!(ItemRecord {
     req_wis             u16;
     req_luc             u16;
     req_vg              u16;
-    unknown             u16     if(ep6v4_or_above);
+    unknown             u16     if(ep6v2_or_above);
     req_og              u8;
     req_ig              u8;
     range               u16;

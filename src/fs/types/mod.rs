@@ -52,7 +52,7 @@ impl Deserialize for GameMode {
         Self: Sized,
     {
         let mode = src.read_u8()?;
-        return match mode {
+        match mode {
             0 => Ok(GameMode::Easy),
             1 => Ok(Self::Normal),
             2 => Ok(Self::Hard),
@@ -61,7 +61,7 @@ impl Deserialize for GameMode {
                 ErrorKind::InvalidInput,
                 format!("invalid game mode {mode}"),
             )),
-        };
+        }
     }
 }
 
@@ -91,7 +91,7 @@ impl Deserialize for PermittedRace {
         Self: Sized,
     {
         let permitted = src.read_u8()?;
-        return match permitted {
+        match permitted {
             0 => Ok(Self::Human),
             1 => Ok(Self::Elf),
             2 => Ok(Self::AllLight),
@@ -104,7 +104,7 @@ impl Deserialize for PermittedRace {
                 ErrorKind::InvalidInput,
                 format!("invalid permitted race {permitted}"),
             )),
-        };
+        }
     }
 }
 
@@ -141,7 +141,7 @@ impl Deserialize for ElementType {
         let element_id = element_type % 4;
         let element_level = element_type / 4 + 1;
 
-        return match element_id {
+        match element_id {
             0 => Ok(Self::None),
             1 => Ok(Self::Fire(element_level)),
             2 => Ok(Self::Water(element_level)),
@@ -151,7 +151,7 @@ impl Deserialize for ElementType {
                 ErrorKind::InvalidInput,
                 format!("invalid element type {element_type}"),
             )),
-        };
+        }
     }
 }
 

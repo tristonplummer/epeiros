@@ -221,7 +221,7 @@ impl Deserialize for TargetType {
         Self: Sized,
     {
         let target_type = src.read_u8()?;
-        return match target_type {
+        match target_type {
             0 => Ok(Self::CannotBeCasted),
             1 => Ok(Self::None),
             2 => Ok(Self::OnSelf),
@@ -235,7 +235,7 @@ impl Deserialize for TargetType {
                 ErrorKind::InvalidInput,
                 format!("invalid target type {target_type}"),
             )),
-        };
+        }
     }
 }
 
@@ -270,7 +270,7 @@ impl Deserialize for SkillCategory {
         Self: Sized,
     {
         let category = src.read_u8()?;
-        return match category {
+        match category {
             0 => Ok(Self::None),
             1 => Ok(Self::Passive),
             2 => Ok(Self::Basic),
@@ -280,7 +280,7 @@ impl Deserialize for SkillCategory {
                 ErrorKind::InvalidInput,
                 format!("invalid category {category}"),
             )),
-        };
+        }
     }
 }
 
@@ -311,7 +311,7 @@ impl Deserialize for DamageType {
         Self: Sized,
     {
         let damage_type = src.read_u8()?;
-        return match damage_type {
+        match damage_type {
             0 => Ok(Self::Fixed),
             1 => Ok(Self::PlusAdditional),
             2 => Ok(Self::Coefficient),
@@ -324,7 +324,7 @@ impl Deserialize for DamageType {
                 ErrorKind::InvalidInput,
                 format!("invalid damage type {damage_type}"),
             )),
-        };
+        }
     }
 }
 
@@ -358,7 +358,7 @@ impl Deserialize for DamageOverTimeType {
         Self: Sized,
     {
         let dot_type = src.read_u8()?;
-        return match dot_type {
+        match dot_type {
             0 => Ok(Self::None),
             4 => Ok(Self::Percent),
             12 => Ok(Self::Exponential),
@@ -366,7 +366,7 @@ impl Deserialize for DamageOverTimeType {
                 ErrorKind::InvalidInput,
                 format!("invalid damage over time type {dot_type}"),
             )),
-        };
+        }
     }
 }
 
@@ -395,7 +395,7 @@ impl Deserialize for DurationType {
         Self: Sized,
     {
         let duration_type = src.read_u8()?;
-        return match duration_type {
+        match duration_type {
             0 => Ok(Self::SecondsAndDisappearOnDeath),
             1 => Ok(Self::HoursAndPersistsOnDeath),
             2 => Ok(Self::SecondsAndPersistsOnDeath),
@@ -403,7 +403,7 @@ impl Deserialize for DurationType {
                 ErrorKind::InvalidInput,
                 format!("invalid duration type {duration_type}"),
             )),
-        };
+        }
     }
 }
 
