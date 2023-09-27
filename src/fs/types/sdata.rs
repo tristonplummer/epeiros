@@ -203,9 +203,10 @@ macro_rules! sdata_record {
             );* $(;)?
         }
     ) => {
-        #[derive(Default, Debug, serde::Deserialize, serde::Serialize)]
+        #[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
         pub struct $ident {
             $(
+                #[serde(skip_serializing_if = "crate::fs::types::sdata::is_default")]
                 pub $field: user_type!($typ $(<$generics>)?),
             )*
         }
@@ -246,6 +247,10 @@ macro_rules! sdata_record {
             }
         }
     };
+}
+
+pub fn is_default<T: Default + PartialEq>(t: &T) -> bool {
+    t == &T::default()
 }
 
 pub(crate) use {sdata_record, user_type, user_type_readable, user_type_writeable};

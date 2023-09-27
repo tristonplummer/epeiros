@@ -102,12 +102,11 @@ impl Deserialize for ItemData {
         let max_item_type = src.read_u32::<LE>()? as usize;
         for item_type in 1..=max_item_type {
             let max_item_type_id = src.read_u32::<LE>()? as usize;
-            for item_type_id in 1..=max_item_type_id {
+            for _item_type_id in 1..=max_item_type_id {
                 let record = ItemRecord::versioned_deserialize(&mut src, version)?;
-                let mut records = map
-                    .entry(item_type)
-                    .or_insert_with(|| Vec::with_capacity(max_item_type_id));
-                records.push(record);
+                map.entry(item_type)
+                    .or_insert_with(|| Vec::with_capacity(max_item_type_id))
+                    .push(record);
             }
         }
 
