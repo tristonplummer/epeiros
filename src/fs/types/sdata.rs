@@ -78,7 +78,7 @@ macro_rules! user_type {
 }
 
 macro_rules! user_type_readable {
-    ($src:ident, $version:ident, u8 $if:expr) => {
+    ($src:ident, $version:ident, u8, $if:expr) => {
         if $if($version) {
             $src.read_u8()?
         } else {
@@ -91,7 +91,7 @@ macro_rules! user_type_readable {
     ($src:ident, $version:ident, bool) => {
         1 == $src.read_u8()?
     };
-    ($src:ident, $version:ident, bool $if:expr) => {
+    ($src:ident, $version:ident, bool, $if:expr) => {
         if $if($version) {
             1 == $src.read_u8()?
         } else {
@@ -101,7 +101,7 @@ macro_rules! user_type_readable {
     ($src:ident, $version:ident, u16) => {
         $src.read_u16::<byteorder::LittleEndian>()?
     };
-    ($src:ident, $version:ident, u16 $if:expr) => {
+    ($src:ident, $version:ident, u16, $if:expr) => {
         if $if($version) {
             $src.read_u16::<byteorder::LittleEndian>()?
         } else {
@@ -111,7 +111,7 @@ macro_rules! user_type_readable {
     ($src:ident, $version:ident, u32) => {
         $src.read_u32::<byteorder::LittleEndian>()?
     };
-    ($src:ident, $version:ident, u32 $if:expr) => {
+    ($src:ident, $version:ident, u32, $if:expr) => {
         if $if($version) {
             $src.read_u32::<byteorder::LittleEndian>()?
         } else {
@@ -121,14 +121,14 @@ macro_rules! user_type_readable {
     ($src:ident, $version:ident, String) => {
         $src.read_length_prefixed_string()?
     };
-    ($src:ident, $version:ident, String $if:expr) => {
+    ($src:ident, $version:ident, String, $if:expr) => {
         if $if($version) {
             $src.read_length_prefixed_string()?
         } else {
             String::new()
         }
     };
-    ($src:ident, $version:ident, Vec <$inner:ident> $len:expr) => {{
+    ($src:ident, $version:ident, Vec <$inner:ident>, $len:expr) => {{
         let length = $len($version);
         let mut vec = Vec::with_capacity(length);
         for _ in 0..length {
@@ -137,50 +137,60 @@ macro_rules! user_type_readable {
         }
         vec
     }};
+    ($src:ident, $version:ident, $typ:ty) => {
+        <$typ>::versioned_deserialize($src, $version)?
+    };
+    ($src:ident, $version:ident, $typ:ty, $if:expr) => {
+        if $if($version) {
+            <$typ>::versioned_deserialize($src, $version)?
+        } else {
+            <$typ>::default()
+        }
+    };
 }
 
 macro_rules! user_type_writeable {
-    ($dst:ident, $version:ident, u8 $value:expr, $if:expr) => {
+    ($dst:ident, $version:ident, u8, $value:expr, $if:expr) => {
         if $if($version) {
             $dst.write_u8(*$value)?
         }
     };
-    ($dst:ident, $version:ident, u8 $value:expr) => {
+    ($dst:ident, $version:ident, u8, $value:expr) => {
         $dst.write_u8(*$value)?
     };
-    ($dst:ident, $version:ident, bool $value:expr) => {
+    ($dst:ident, $version:ident, bool, $value:expr) => {
         $dst.write_u8(if *$value { 1 } else { 0 })?
     };
-    ($dst:ident, $version:ident, bool $value:expr, $if:expr) => {
+    ($dst:ident, $version:ident, bool, $value:expr, $if:expr) => {
         if $if($version) {
             $dst.write_u8(if *$value { 1 } else { 0 })?
         }
     };
-    ($dst:ident, $version:ident, u16 $value:expr) => {
+    ($dst:ident, $version:ident, u16, $value:expr) => {
         $dst.write_u16::<byteorder::LittleEndian>(*$value)?
     };
-    ($dst:ident, $version:ident, u16 $value:expr, $if:expr) => {
+    ($dst:ident, $version:ident, u16, $value:expr, $if:expr) => {
         if $if($version) {
             $dst.write_u16::<byteorder::LittleEndian>(*$value)?
         }
     };
-    ($dst:ident, $version:ident, u32 $value:expr) => {
+    ($dst:ident, $version:ident, u32, $value:expr) => {
         $dst.write_u32::<byteorder::LittleEndian>(*$value)?
     };
-    ($dst:ident, $version:ident, u32 $value:expr, $if:expr) => {
+    ($dst:ident, $version:ident, u32, $value:expr, $if:expr) => {
         if $if($version) {
             $dst.write_u32::<byteorder::LittleEndian>(*$value)?
         }
     };
-    ($dst:ident, $version:ident, String $value:expr) => {
+    ($dst:ident, $version:ident, String, $value:expr) => {
         $dst.write_length_prefixed_string($value)?
     };
-    ($dst:ident, $version:ident, String $value:expr, $if:expr) => {
+    ($dst:ident, $version:ident, String, $value:expr, $if:expr) => {
         if $if($version) {
             $dst.write_length_prefixed_string($value)?
         }
     };
-    ($dst:ident, $version:ident, Vec <$inner:ident> $value:expr, $len:expr) => {{
+    ($dst:ident, $version:ident, Vec <$inner:ident>, $value:expr, $len:expr) => {{
         let length = $len($version);
         for idx in 0..length {
             if idx >= $value.len() {
@@ -191,6 +201,14 @@ macro_rules! user_type_writeable {
             }
         }
     }};
+    ($dst:ident, $version:ident, $typ:ty, $value:expr) => {
+        $value.versioned_serialize($dst, $version)?
+    };
+    ($dst:ident, $version:ident, $typ:ty, $value:expr, $if:expr) => {
+        if $if($version) {
+            $value.versioned_serialize($dst, $version)?
+        }
+    };
 }
 
 macro_rules! sdata_record {
@@ -221,7 +239,7 @@ macro_rules! sdata_record {
                 Self: Sized
             {
                 $(
-                    let $field = user_type_readable!(src, version, $typ $(<$generics>)? $($if)? $($len)?);
+                    let $field = user_type_readable!(src, version, $typ $(<$generics>)? $(,$if)? $(,$len)?);
                 )*
 
                 Ok(Self {
@@ -241,7 +259,7 @@ macro_rules! sdata_record {
                 T: Write + WriteBytesExt
             {
                 $(
-                    user_type_writeable!(dst, version, $typ $(<$generics>)? &self.$field $(,$if)? $(,$len)?);
+                    user_type_writeable!(dst, version, $typ $(<$generics>)?, &self.$field $(,$if)? $(,$len)?);
                 )*
                 Ok(())
             }

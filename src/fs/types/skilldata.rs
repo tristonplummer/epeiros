@@ -1,5 +1,7 @@
 use crate::fs::types::ep6_or_above;
-use crate::fs::types::{sdata_record, user_type, user_type_readable, user_type_writeable, SData};
+use crate::fs::types::{
+    sdata_record, user_type, user_type_readable, user_type_writeable, PermittedRace, SData,
+};
 use crate::io::{Deserialize, GameVersion, Serialize, ShaiyaReadExt, ShaiyaWriteExt};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use std::collections::BTreeMap;
@@ -18,7 +20,7 @@ sdata_record!(SkillRecord {
     toggle_type                     u8;
     sound                           u16;
     min_level                       u16;
-    country                         u8;
+    permitted_races                 PermittedRace;
     usable_by_fighter               bool;
     usable_by_defender              bool;
     usable_by_ranger                bool;

@@ -1,6 +1,6 @@
 use crate::fs::types::{
     ep6_or_above, ep6v4_or_above, sdata_record, user_type, user_type_readable, user_type_writeable,
-    SData,
+    PermittedRace, SData,
 };
 use crate::io::{Deserialize, GameVersion, Serialize, ShaiyaReadExt, ShaiyaWriteExt};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
@@ -18,7 +18,7 @@ sdata_record!(ItemRecord {
     model               u8;
     icon                u8;
     min_level           u16;
-    country             u8;
+    permitted_races     PermittedRace;
     usable_by_fighter   bool;
     usable_by_defender  bool;
     usable_by_ranger    bool;
