@@ -156,7 +156,7 @@ impl Header {
 impl Default for Header {
     fn default() -> Self {
         let root = VirtualDirectory {
-            name: "data".to_owned(),
+            name: String::default(),
             subdirectories: Vec::new(),
             nodes: Vec::new(),
         };
