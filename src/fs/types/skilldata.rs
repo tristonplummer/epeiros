@@ -435,6 +435,6 @@ fn ranks_per_skill_for_version(version: GameVersion) -> usize {
     match version {
         GameVersion::Ep4 => 3,
         GameVersion::Ep5 => 5,
-        GameVersion::Ep6 | GameVersion::Ep6v4 => 15,
+        GameVersion::Ep6 | GameVersion::Ep6v2 => 15,
     }
 }

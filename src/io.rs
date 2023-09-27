@@ -5,7 +5,7 @@ pub enum GameVersion {
     Ep4,
     Ep5,
     Ep6,
-    Ep6v4,
+    Ep6v2,
 }
 
 pub trait Serialize {

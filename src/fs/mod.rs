@@ -137,4 +137,28 @@ mod tests {
         )
         .unwrap();
     }
+
+    #[test]
+    fn item_test() {
+        let item = std::fs::read("res/KreonItem.SData").unwrap();
+        let mut src = Cursor::new(item.as_slice());
+
+        let items = ItemData::versioned_deserialize(&mut src, GameVersion::Ep6v2).unwrap();
+        std::fs::write(
+            "res/kreonitems.json",
+            serde_json::to_vec_pretty(&items).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn item_ser_test() {
+        let kreon = std::fs::read_to_string("res/kreonitems.json").unwrap();
+        let data: ItemData = serde_json::from_str(&kreon).unwrap();
+
+        let mut out = Vec::new();
+        data.versioned_serialize(&mut out, GameVersion::Ep6v2)
+            .unwrap();
+        std::fs::write("res/KreonItem.out.SData", &out).unwrap();
+    }
 }

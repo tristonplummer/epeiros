@@ -67,8 +67,8 @@ pub(crate) fn ep6_or_above(version: GameVersion) -> bool {
     version >= GameVersion::Ep6
 }
 
-pub(crate) fn ep6v4_or_above(version: GameVersion) -> bool {
-    version >= GameVersion::Ep6v4
+pub(crate) fn ep6v2_or_above(version: GameVersion) -> bool {
+    version >= GameVersion::Ep6v2
 }
 
 macro_rules! user_type {
@@ -225,6 +225,7 @@ macro_rules! sdata_record {
         pub struct $ident {
             $(
                 #[serde(skip_serializing_if = "crate::fs::types::sdata::is_default")]
+                #[serde(default)]
                 pub $field: user_type!($typ $(<$generics>)?),
             )*
         }
