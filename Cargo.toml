@@ -9,10 +9,18 @@ name        = "epeiros"
 path        = "src/lib.rs"
 
 [features]
-default     = ["filestore"]
+default     = ["filestore", "protocol"]
 filestore   = ["dep:memmap2"]
+protocol    = ["dep:aes", "dep:cipher", "dep:ctr", "dep:hmac", "dep:rsa", "dep:sha2"]
 
 [dependencies]
+aes         = { version = "0.8", optional = true }
 byteorder   = "1.4"
+cipher      = { version = "0.4", optional = true }
+ctr         = { version = "0.9", optional = true }
+hmac        = { version = "0.12", optional = true }
 memmap2     = { version = "0.7", optional = true }
+rsa         = { version = "0.9", optional = true }
+sha2        = { version = "0.10", optional = true }
 thiserror   = "1.0"
+tracing     = "0.1"
