@@ -27,7 +27,7 @@ sdata_record!(SkillRecord {
     min_game_mode                   GameMode;
     skill_point_cost                u8;
     category                        SkillCategory;
-    type_attack                     u8;
+    attack_type                     AttackType;
     type_effect                     u8;
     type_detail                     u16;
     usable_with_one_handed_sword    bool;
@@ -150,6 +150,15 @@ pub enum DurationType {
     SecondsAndDisappearOnDeath,
     HoursAndPersistsOnDeath,
     SecondsAndPersistsOnDeath,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum AttackType {
+    #[default]
+    Passive,
+    Physical,
+    Shooting,
+    Magic,
 }
 
 impl Deserialize for SkillData {
@@ -418,6 +427,45 @@ impl Serialize for DurationType {
             Self::None | Self::SecondsAndDisappearOnDeath => 0,
             Self::HoursAndPersistsOnDeath => 1,
             Self::SecondsAndPersistsOnDeath => 2,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for AttackType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let attack_type = src.read_u8()?;
+        match attack_type {
+            0 => Ok(Self::Passive),
+            1 => Ok(Self::Physical),
+            2 => Ok(Self::Shooting),
+            3 => Ok(Self::Magic),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid attack type {attack_type}"),
+            )),
+        }
+    }
+}
+
+impl Serialize for AttackType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::Passive => 0,
+            Self::Physical => 1,
+            Self::Shooting => 2,
+            Self::Magic => 3,
         };
         dst.write_u8(id)
     }
