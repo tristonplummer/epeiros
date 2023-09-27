@@ -1,0 +1,18 @@
+[package]
+name        = "epeiros"
+version     = "0.1.0"
+edition     = "2021"
+authors     = ["cupsocino"]
+
+[lib]
+name        = "epeiros"
+path        = "src/lib.rs"
+
+[features]
+default     = ["filestore"]
+filestore   = ["dep:memmap2"]
+
+[dependencies]
+byteorder   = "1.4"
+memmap2     = { version = "0.7", optional = true }
+thiserror   = "1.0"
