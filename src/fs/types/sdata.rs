@@ -63,6 +63,14 @@ fn is_encrypted(buf: &[u8]) -> bool {
     String::from_utf8_lossy(&buf[..SEED_SIGNATURE.len()]).eq(SEED_SIGNATURE)
 }
 
+pub(crate) fn ep6_or_above(version: GameVersion) -> bool {
+    version >= GameVersion::Ep6
+}
+
+pub(crate) fn ep6v4_or_above(version: GameVersion) -> bool {
+    version >= GameVersion::Ep6v4
+}
+
 macro_rules! user_type {
     ($typ:ty) => {
         $typ
@@ -96,6 +104,16 @@ macro_rules! user_type_readable {
     ($src:ident, $version:ident, u16 $if:expr) => {
         if $if($version) {
             $src.read_u16::<byteorder::LittleEndian>()?
+        } else {
+            0
+        }
+    };
+    ($src:ident, $version:ident, u32) => {
+        $src.read_u32::<byteorder::LittleEndian>()?
+    };
+    ($src:ident, $version:ident, u32 $if:expr) => {
+        if $if($version) {
+            $src.read_u32::<byteorder::LittleEndian>()?
         } else {
             0
         }
@@ -142,8 +160,16 @@ macro_rules! user_type_writeable {
         $dst.write_u16::<byteorder::LittleEndian>(*$value)?
     };
     ($dst:ident, $version:ident, u16 $value:expr, $if:expr) => {
-        $if($version) {
+        if $if($version) {
             $dst.write_u16::<byteorder::LittleEndian>(*$value)?
+        }
+    };
+    ($dst:ident, $version:ident, u32 $value:expr) => {
+        $dst.write_u32::<byteorder::LittleEndian>(*$value)?
+    };
+    ($dst:ident, $version:ident, u32 $value:expr, $if:expr) => {
+        if $if($version) {
+            $dst.write_u32::<byteorder::LittleEndian>(*$value)?
         }
     };
     ($dst:ident, $version:ident, String $value:expr) => {
@@ -214,7 +240,7 @@ macro_rules! sdata_record {
                 T: Write + WriteBytesExt
             {
                 $(
-                    user_type_writeable!(dst, version, $typ $(<$generics>)? &self.$field$(,$if)? $(,$len)?);
+                    user_type_writeable!(dst, version, $typ $(<$generics>)? &self.$field $(,$if)? $(,$len)?);
                 )*
                 Ok(())
             }

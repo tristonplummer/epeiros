@@ -77,7 +77,7 @@ impl ReadableStorage for ImmutableFilestore {
 
 #[cfg(test)]
 mod tests {
-    use crate::fs::types::SkillData;
+    use crate::fs::types::{ItemData, SkillData};
     use crate::fs::{ImmutableFilestore, ReadableStorage};
     use crate::io::{Deserialize, GameVersion, Serialize};
     use std::io::Cursor;
@@ -94,15 +94,20 @@ mod tests {
         let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
             .expect("failed to open filestore");
         let character_skills = fs
-            .read_versioned_type::<SkillData>("character/skill.sdata", GameVersion::Ep6)
+            .read_versioned_type::<ItemData>("item/item.sdata", GameVersion::Ep6)
             .unwrap();
 
+        std::fs::write(
+            "res/items.json",
+            serde_json::to_vec_pretty(&character_skills).unwrap(),
+        )
+        .unwrap();
         let mut out = Vec::new();
         character_skills
             .versioned_serialize(&mut out, GameVersion::Ep6)
             .unwrap();
 
-        std::fs::write("res/Skill.SData", &out).unwrap();
+        std::fs::write("res/Item.SData", &out).unwrap();
     }
 
     #[test]

@@ -1,3 +1,4 @@
+use crate::fs::types::ep6_or_above;
 use crate::fs::types::{sdata_record, user_type, user_type_readable, user_type_writeable, SData};
 use crate::io::{Deserialize, GameVersion, Serialize, ShaiyaReadExt, ShaiyaWriteExt};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
@@ -157,10 +158,6 @@ impl Serialize for SkillData {
     }
 }
 
-fn ep6_or_above(version: GameVersion) -> bool {
-    version >= GameVersion::Ep6
-}
-
 fn max_ability_types_for_version(version: GameVersion) -> usize {
     if version >= GameVersion::Ep6 {
         10
@@ -173,6 +170,6 @@ fn ranks_per_skill_for_version(version: GameVersion) -> usize {
     match version {
         GameVersion::Ep4 => 3,
         GameVersion::Ep5 => 5,
-        GameVersion::Ep6 => 15,
+        GameVersion::Ep6 | GameVersion::Ep6v4 => 15,
     }
 }
