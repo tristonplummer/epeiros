@@ -27,9 +27,16 @@ pub trait ShaiyaReadExt {
     fn skip(&mut self, length: usize) -> Result<(), Self::Error>;
 }
 
-impl<T> ShaiyaReadExt for T
+pub trait ShaiyaWriteExt {
+    type Error;
+
+    fn write_string<T>(&mut self, text: T, length: usize) -> Result<(), Self::Error>
+    where
+        T: AsRef<str>;
+}
+impl<R> ShaiyaReadExt for R
 where
-    T: std::io::Read + byteorder::ReadBytesExt,
+    R: std::io::Read + byteorder::ReadBytesExt,
 {
     type Error = std::io::Error;
 
@@ -66,6 +73,29 @@ where
     fn skip(&mut self, length: usize) -> Result<(), Self::Error> {
         let mut dst = vec![0; length];
         self.read_exact(&mut dst)?;
+        Ok(())
+    }
+}
+
+impl<W> ShaiyaWriteExt for W
+where
+    W: std::io::Write,
+{
+    type Error = std::io::Error;
+
+    fn write_string<T>(&mut self, text: T, length: usize) -> Result<(), Self::Error>
+    where
+        T: AsRef<str>,
+    {
+        let mut dst = vec![0; length];
+        let bytes = text.as_ref().as_bytes();
+        dst[..bytes.len()].copy_from_slice(bytes);
+
+        if let Some(last) = dst.last_mut() {
+            *last = 0;
+        }
+
+        self.write_all(&dst)?;
         Ok(())
     }
 }
