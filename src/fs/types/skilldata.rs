@@ -1,7 +1,4 @@
-use crate::fs::types::ep6_or_above;
-use crate::fs::types::{
-    sdata_record, user_type, user_type_readable, user_type_writeable, PermittedRace, SData,
-};
+use crate::fs::types::*;
 use crate::io::{Deserialize, GameVersion, Serialize, ShaiyaReadExt, ShaiyaWriteExt};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use std::collections::BTreeMap;
@@ -27,7 +24,7 @@ sdata_record!(SkillRecord {
     usable_by_archer                bool;
     usable_by_mage                  bool;
     usable_by_priest                bool;
-    min_game_mode                   u8;
+    min_game_mode                   GameMode;
     skill_point_cost                u8;
     category                        u8;
     type_attack                     u8;
