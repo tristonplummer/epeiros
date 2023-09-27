@@ -89,11 +89,11 @@ macro_rules! user_type_readable {
         $src.read_u8()?
     };
     ($src:ident, $version:ident, bool) => {
-        1 >= $src.read_u8()?
+        1 <= $src.read_u8()?
     };
     ($src:ident, $version:ident, bool, $if:expr) => {
         if $if($version) {
-            1 >= $src.read_u8()?
+            1 <= $src.read_u8()?
         } else {
             false
         }
@@ -138,11 +138,11 @@ macro_rules! user_type_readable {
         vec
     }};
     ($src:ident, $version:ident, $typ:ty) => {
-        <$typ>::versioned_deserialize($src, $version)?
+        <$typ>::versioned_deserialize($src, $version).unwrap()
     };
     ($src:ident, $version:ident, $typ:ty, $if:expr) => {
         if $if($version) {
-            <$typ>::versioned_deserialize($src, $version)?
+            <$typ>::versioned_deserialize($src, $version).unwrap()
         } else {
             <$typ>::default()
         }

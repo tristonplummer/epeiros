@@ -109,6 +109,7 @@ pub enum TargetType {
     AroundCaster,
     AroundTarget,
     Raid,
+    Unknown(u8),
 }
 
 #[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
@@ -179,6 +180,7 @@ impl Deserialize for SkillData {
         for skill_id in 1..=max_skill_id {
             for _rank in 1..=ranks_per_skill {
                 let record = SkillRecord::versioned_deserialize(&mut src, version)?;
+                // println!("{:?}", record);
                 map.entry(skill_id)
                     .or_insert_with(|| Vec::with_capacity(ranks_per_skill))
                     .push(record);
@@ -240,10 +242,7 @@ impl Deserialize for TargetType {
             6 => Ok(Self::AroundCaster),
             7 => Ok(Self::AroundTarget),
             8 => Ok(Self::Raid),
-            _ => Err(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                format!("invalid target type {target_type}"),
-            )),
+            _ => Ok(Self::Unknown(target_type)),
         }
     }
 }
@@ -265,6 +264,7 @@ impl Serialize for TargetType {
             Self::AroundCaster => 6,
             Self::AroundTarget => 7,
             Self::Raid => 8,
+            Self::Unknown(id) => id,
         };
         dst.write_u8(id)
     }
