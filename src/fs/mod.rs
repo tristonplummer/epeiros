@@ -3,26 +3,57 @@ use crate::io::{Deserialize, GameVersion, Serialize};
 use crc32fast::Hasher;
 use memmap2::Mmap;
 use std::fs::{File, OpenOptions};
-use std::io::{Cursor, Error, Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 pub mod header;
 pub mod types;
 
 pub trait ReadableStorage {
+    /// Get the path to every node contained within the storage.
     fn all_node_paths(&self) -> Vec<String>;
 
+    /// Reads a file at a given path in the virtual filesystem. This will return `None` if a node
+    /// is not found at the given path.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file, relative to the root directory.
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>;
 
-    fn read_type<T>(&mut self, virtual_path: impl AsRef<str>) -> Result<T, std::io::Error>
+    /// Deserializes a file at a given path in the filesystem. This will attempt to deserialize
+    /// with every game version, until it either fails or finds a match. If you know the relevant
+    /// [GameVersion] before hand, please use [Self::read_versioned_type] and specify it
+    /// explicitly.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file, relative to the root directory.
+    fn read_type<T>(
+        &mut self,
+        virtual_path: impl AsRef<str>,
+    ) -> Result<(T, GameVersion), std::io::Error>
     where
         T: Deserialize<Error = std::io::Error>,
     {
-        self.read_versioned_type(virtual_path, GameVersion::Ep4)
+        for version in GameVersion::all() {
+            if let Ok(data) = self.read_versioned_type(virtual_path.as_ref(), *version) {
+                return Ok((data, *version));
+            }
+        }
+        Err(std::io::Error::new(
+            ErrorKind::InvalidInput,
+            "did not match any game version",
+        ))
     }
 
+    /// Deserializes a file at a given path in the filesystem, using a specified [GameVersion]. This will
+    /// not attempt to parse the file with any other versions, and should only be used in a scenario where you
+    /// know the encoded version beforehand.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file, relative to the root directory.
+    /// * `version`         - The game version.
     fn read_versioned_type<T>(
         &mut self,
         virtual_path: impl AsRef<str>,
@@ -45,6 +76,13 @@ pub trait ReadableStorage {
 }
 
 pub trait WritableStorage {
+    /// Writes some data to a node at a given path. If the node does not already exist, it will
+    /// be created.
+    ///
+    /// # Arguments
+    /// * `virtual_path`        - The path to file node.
+    /// * `data`                - The data to write.
+    /// * `serialize_header`    - If the header should be serialized. This should be set to false when writing multiple files.
     fn write<T>(
         &mut self,
         virtual_path: T,
@@ -54,6 +92,14 @@ pub trait WritableStorage {
     where
         T: AsRef<str>;
 
+    /// Writes a serializable type to a node at a given path. If the node does not already exist, it
+    /// will be created. The type will be serialized with the latest [GameVersion] using [GameVersion::last].
+    /// If you already know what version the data should support, please use [Self::write_versioned_type]
+    /// with an explicit version.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file node.
+    /// * `typ`             - The serializable type.
     fn write_type<T>(
         &mut self,
         virtual_path: impl AsRef<str>,
@@ -62,9 +108,16 @@ pub trait WritableStorage {
     where
         T: Serialize<Error = std::io::Error>,
     {
-        self.write_versioned_type(virtual_path, typ, GameVersion::Ep4)
+        self.write_versioned_type(virtual_path, typ, *GameVersion::last())
     }
 
+    /// Writes a serializable type to a given at a given path. If the node does not already exist, it
+    /// will be created.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file node.
+    /// * `typ`             - The serializable type.
+    /// * `version`         - The game version used for serialization.
     fn write_versioned_type<T>(
         &mut self,
         virtual_path: impl AsRef<str>,
@@ -74,18 +127,23 @@ pub trait WritableStorage {
     where
         T: Serialize<Error = std::io::Error>,
     {
-        let mut dst = Vec::new();
+        let mut dst = Vec::with_capacity(10_000);
         typ.versioned_serialize(&mut dst, version)?;
 
         self.write(virtual_path, &dst, true)
     }
 }
 
+/// An efficient, read-only view over a filestore. This will not allow any files to be modified, and
+/// is backed by a memory-mapped view of the data file.
 pub struct ImmutableFilestore {
     header: Header,
     data_file: Mmap,
 }
 
+/// A filestore which supports both reading and writing of files. This uses traditional disk I/O. If
+/// only reading is required, consider using [ImmutableFilestore] as it will read data much more
+/// quickly.
 pub struct MutableFilestore {
     header_file: File,
     header: Header,
@@ -93,6 +151,15 @@ pub struct MutableFilestore {
 }
 
 impl ImmutableFilestore {
+    /// Opens a filestore from a known header and data file path.
+    ///
+    /// # Errors
+    /// Returns an error if either of the files don't exist, or if the header
+    /// cannot be parsed.
+    ///
+    /// # Arguments
+    /// * `header_path` - The path to the header file.
+    /// * `data_path`   - The path to the data file.
     pub fn open<P>(header_path: P, data_path: P) -> Result<Self, HeaderDeserializeError>
     where
         P: AsRef<Path>,
@@ -107,10 +174,16 @@ impl ImmutableFilestore {
 }
 
 impl ReadableStorage for ImmutableFilestore {
+    /// Get the path to every node contained within the storage.
     fn all_node_paths(&self) -> Vec<String> {
         self.header.get_all_node_paths()
     }
 
+    /// Reads a file at a given path in the virtual filesystem. This will return `None` if a node
+    /// is not found at the given path.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file, relative to the root directory.
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>,
@@ -126,6 +199,16 @@ impl ReadableStorage for ImmutableFilestore {
 }
 
 impl MutableFilestore {
+    /// Opens an existing filestore from a header and data file path. If you don't need to
+    /// write to this filestore, consider using [ImmutableFilestore::open] instead.
+    ///
+    /// # Errors
+    /// Returns an error if either of the files don't exist, or if the header
+    /// cannot be parsed.
+    ///
+    /// # Arguments
+    /// * `header_path` - The path to the header file.
+    /// * `data_path`   - The path to the data file.
     pub fn open<P>(header_path: P, data_path: P) -> Result<Self, HeaderDeserializeError>
     where
         P: AsRef<Path>,
@@ -144,7 +227,14 @@ impl MutableFilestore {
         })
     }
 
-    pub fn create<P>(header_path: P, data_path: P) -> Result<Self, HeaderDeserializeError>
+    /// Creates an empty filestore at a given path. If files already exist at the specified paths,
+    /// they will be overwritten. This is useful for creating patches from flat files. If you need to
+    /// update an existing filestore without losing the data, use [Self::open].
+    ///
+    /// # Arguments
+    /// * `header_path` - The path where the header file should be created.
+    /// * `data_path`   - The path where the data file should be created.
+    pub fn create<P>(header_path: P, data_path: P) -> Result<Self, std::io::Error>
     where
         P: AsRef<Path>,
     {
@@ -161,6 +251,7 @@ impl MutableFilestore {
         })
     }
 
+    /// Serializes the header view to the backing file.
     fn serialize_header(&mut self) -> Result<(), std::io::Error> {
         let mut dst = Vec::with_capacity(4_000_000);
         self.header.serialize(&mut dst)?;
@@ -170,7 +261,12 @@ impl MutableFilestore {
         Ok(())
     }
 
-    pub fn patch(&mut self, other: &mut impl ReadableStorage) -> Result<(), Error> {
+    /// Patches this filestore by taking every file from `other`, and placing it at the same path
+    /// in this filestore.
+    ///
+    /// # Arguments
+    /// * `other`   - The storage to read from.
+    pub fn patch(&mut self, other: &mut impl ReadableStorage) -> Result<(), std::io::Error> {
         let other_nodes = other.all_node_paths();
         for node in &other_nodes {
             let data = other
@@ -185,10 +281,16 @@ impl MutableFilestore {
 }
 
 impl ReadableStorage for MutableFilestore {
+    /// Get the path to every node contained within the storage.
     fn all_node_paths(&self) -> Vec<String> {
         self.header.get_all_node_paths()
     }
 
+    /// Reads a file at a given path in the virtual filesystem. This will return `None` if a node
+    /// is not found at the given path.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the file, relative to the root directory.
     fn read<T>(&mut self, virtual_path: T) -> Option<Vec<u8>>
     where
         T: AsRef<str>,
@@ -214,12 +316,19 @@ impl ReadableStorage for MutableFilestore {
 }
 
 impl WritableStorage for MutableFilestore {
+    /// Writes some data to a node at a given path. If the node does not already exist, it will
+    /// be created.
+    ///
+    /// # Arguments
+    /// * `virtual_path`        - The path to file node.
+    /// * `data`                - The data to write.
+    /// * `serialize_header`    - If the header should be serialized. This should be set to false when writing multiple files.
     fn write<T>(
         &mut self,
         virtual_path: T,
         data: &[u8],
         serialize_header: bool,
-    ) -> Result<(), Error>
+    ) -> Result<(), std::io::Error>
     where
         T: AsRef<str>,
     {
@@ -295,9 +404,7 @@ mod tests {
     fn sdata_write() {
         let mut fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
             .expect("failed to open filestore");
-        let items = fs
-            .read_versioned_type::<ItemData>("item/item.sdata", GameVersion::Ep6)
-            .unwrap();
+        let (items, _version) = fs.read_type::<ItemData>("item/item.sdata").unwrap();
 
         std::fs::write("res/items.json", serde_json::to_vec_pretty(&items).unwrap()).unwrap();
         let mut out = Vec::new();

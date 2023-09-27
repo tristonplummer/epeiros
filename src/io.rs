@@ -8,6 +8,16 @@ pub enum GameVersion {
     Ep6v2,
 }
 
+impl GameVersion {
+    pub fn all<'a>() -> &'a [Self] {
+        &[Self::Ep6v2, Self::Ep6, Self::Ep5, Self::Ep4]
+    }
+
+    pub fn last<'a>() -> &'a Self {
+        &Self::Ep6v2
+    }
+}
+
 pub trait Serialize {
     type Error;
 

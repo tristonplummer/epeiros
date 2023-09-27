@@ -5,20 +5,27 @@ use std::io::{Cursor, Read, Write};
 use std::path::Path;
 use thiserror::Error;
 
+/// The magic value which always appears at the start of the header file.
 const SAH_MAGIC_VALUE: &str = "SAH";
 
+/// The header file format version. This is always set to zero.
 const HEADER_FORMAT_VERSION: u32 = 0;
 
+/// A listing of every [VirtualDirectory] and every [Inode] contained within the virtual
+/// filesystem. This is serialized to a `.SAH` file and used by the game client to look up files
+/// by their path, relative to the root directory.
 pub struct Header {
     root: VirtualDirectory,
 }
 
+/// A directory within the virtual filesystem, which may contain file nodes and other directories.
 pub struct VirtualDirectory {
     pub name: String,
     pub subdirectories: Vec<VirtualDirectory>,
     pub nodes: Vec<Inode>,
 }
 
+/// Represents a file node in the filesystem's corresponding data file.
 pub struct Inode {
     pub name: String,
     pub offset: usize,
@@ -36,6 +43,12 @@ pub enum HeaderDeserializeError {
 }
 
 impl Header {
+    /// Opens and parses an existing header file. This will fail if the header file does not already
+    /// exist, or if an error occurs during parsing. For creating an empty header, please use
+    /// `Header::default()`.
+    ///
+    /// # Arguments
+    /// * `path`    - The path to the header file.
     pub fn open<P>(path: P) -> Result<Self, HeaderDeserializeError>
     where
         P: AsRef<Path>,
@@ -47,7 +60,8 @@ impl Header {
         Self::deserialize(&mut src)
     }
 
-    /// Recursively gets the path to all nodes in the header.
+    /// Recursively gets the path to all nodes in the header. This is useful for getting
+    /// a listing of everything contained within the filesystem.
     pub fn get_all_node_paths(&self) -> Vec<String> {
         let mut paths = Vec::new();
         for inode in &self.root.nodes {
@@ -61,6 +75,11 @@ impl Header {
         paths
     }
 
+    /// Gets an inode contained within the filesystem. This will return `None` if either a directory
+    /// or the file does not exist. The path is case-insensitive.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the node.
     pub fn get_inode<T>(&self, virtual_path: &T) -> Option<&Inode>
     where
         T: AsRef<str>,
@@ -95,6 +114,11 @@ impl Header {
         None
     }
 
+    /// Gets an inode contained within the filesystem. This will return `None` if either a directory
+    /// or the file does not exist. The path is case-insensitive.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to the node.
     pub fn get_inode_mut<T>(&mut self, virtual_path: &T) -> Option<&mut Inode>
     where
         T: AsRef<str>,
@@ -128,6 +152,12 @@ impl Header {
         None
     }
 
+    /// Places an [Inode] into an appropriate position in this filesystem. If the subdirectories
+    /// required to reach this node do not yet exist, they will be allocated.
+    ///
+    /// # Arguments
+    /// * `virtual_path`    - The path to place the node.
+    /// * `node`            - The node data.
     pub fn emplace_node<T>(&mut self, virtual_path: T, node: Inode) -> Result<(), std::io::Error>
     where
         T: AsRef<str>,
@@ -166,25 +196,44 @@ impl Default for Header {
 }
 
 impl VirtualDirectory {
+    /// Gets a subdirectory contained within this directory by name. This does not
+    /// recurse through directories to find it.
+    ///
+    /// # Arguments
+    /// * `name`    - The name of the subdirectory.
     fn get_subdirectory(&mut self, name: &str) -> Option<&mut VirtualDirectory> {
         self.subdirectories
             .iter_mut()
             .find(|s| s.name.eq_ignore_ascii_case(name))
     }
 
+    /// Checks if a subdirectory with a given name exists within this directory. It does not
+    /// recurse through directories.
+    ///
+    /// # Arguments
+    /// * `name`    - The name of the subdirectory.
     fn subdirectory_exists(&self, name: &str) -> bool {
         self.subdirectories
             .iter()
             .any(|s| s.name.eq_ignore_ascii_case(name))
     }
 
+    /// Creates an empty subdirectory with a given name, and returns it.
+    ///
+    /// # Arguments
+    /// * `name`    - The name of the subdirectory.
     fn create_and_get_subdirectory(&mut self, name: &str) -> &mut VirtualDirectory {
         self.create_subdirectory(name);
         self.get_subdirectory(name)
             .expect("failed to get previously created subdirectory")
     }
 
+    /// Creates an empty subdirectory with a given name.
+    ///
+    /// # Arguments
+    /// * `name`    - The name of the subdirectory.
     fn create_subdirectory(&mut self, name: &str) {
+        assert!(!self.subdirectory_exists(name));
         let subdirectory = VirtualDirectory {
             name: name.to_string(),
             subdirectories: Vec::new(),
@@ -193,6 +242,7 @@ impl VirtualDirectory {
         self.subdirectories.push(subdirectory);
     }
 
+    /// Recursively gets the path to every node in this directory, and all of it's subdirectories.
     fn node_paths(&self) -> Vec<String> {
         let mut paths = Vec::with_capacity(self.nodes.len());
         for inode in &self.nodes {
