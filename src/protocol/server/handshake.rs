@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, Serialize};
+use crate::io::{Deserialize, GameVersion, Serialize};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use rsa::traits::PublicKeyParts;
 use rsa::{BigUint, RsaPublicKey};
@@ -45,7 +45,7 @@ impl LoginHandshakeRequest {
 impl Deserialize for LoginHandshakeRequest {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,
@@ -74,7 +74,7 @@ impl Deserialize for LoginHandshakeRequest {
 impl Serialize for LoginHandshakeRequest {
     type Error = std::io::Error;
 
-    fn serialize<T>(&self, dst: &mut T) -> Result<(), Self::Error>
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
     where
         T: Write + WriteBytesExt,
     {

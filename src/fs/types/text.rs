@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, ShaiyaReadExt};
+use crate::io::{Deserialize, GameVersion, ShaiyaReadExt};
 
 /// The prefix that will appear at the beginning of a text file if it is encoded with UTF-16, little endian.
 /// https://learn.microsoft.com/en-us/windows/win32/intl/using-byte-order-marks
@@ -11,7 +11,7 @@ const UTF16_BE: u16 = 0xFEFF;
 impl Deserialize for String {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: std::io::Read + byteorder::ReadBytesExt,
         Self: Sized,

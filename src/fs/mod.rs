@@ -1,5 +1,5 @@
 use crate::fs::header::{Header, HeaderDeserializeError};
-use crate::io::Deserialize;
+use crate::io::{Deserialize, GameVersion};
 use memmap2::Mmap;
 use std::fs::File;
 use std::io::Cursor;
@@ -17,10 +17,21 @@ trait ReadableStorage {
     where
         T: Deserialize<Error = std::io::Error>,
     {
+        self.read_versioned_type(virtual_path, GameVersion::Ep4)
+    }
+
+    fn read_versioned_type<T>(
+        &self,
+        virtual_path: impl AsRef<str>,
+        version: GameVersion,
+    ) -> Result<T, std::io::Error>
+    where
+        T: Deserialize<Error = std::io::Error>,
+    {
         match self.read(virtual_path) {
             Some(mut data) => {
                 let mut src = Cursor::new(&mut data);
-                T::deserialize(&mut src)
+                T::versioned_deserialize(&mut src, version)
             }
             None => Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
@@ -66,12 +77,54 @@ impl ReadableStorage for ImmutableFilestore {
 
 #[cfg(test)]
 mod tests {
+    use crate::fs::types::SkillData;
     use crate::fs::{ImmutableFilestore, ReadableStorage};
+    use crate::io::{Deserialize, GameVersion, Serialize};
+    use std::io::Cursor;
 
     #[test]
     fn test() {
         let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
             .expect("failed to open filestore");
         assert!(fs.read_type::<String>("filter.txt").is_ok())
+    }
+
+    #[test]
+    fn sdata_write() {
+        let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
+            .expect("failed to open filestore");
+
+        let data = std::fs::read("res/Skill.in.SData").unwrap();
+        let mut src = Cursor::new(data.as_slice());
+        let sdata = SkillData::versioned_deserialize(&mut src, GameVersion::Ep6).unwrap();
+
+        std::fs::write(
+            "res/skills_ep6v3.json",
+            serde_json::to_vec_pretty(&sdata).unwrap(),
+        )
+        .unwrap();
+
+        let mut dst = Vec::new();
+        sdata
+            .versioned_serialize(&mut dst, GameVersion::Ep6)
+            .unwrap();
+
+        std::fs::write("res/Skill.SData", &dst).expect("");
+    }
+
+    #[test]
+    fn sdata_read() {
+        let fs = ImmutableFilestore::open("res/data.sah", "res/data.saf")
+            .expect("failed to open filestore");
+
+        let mut indata = std::fs::read("res/Skill.SData").unwrap();
+        let mut src = Cursor::new(indata.as_slice());
+        let sdata = SkillData::versioned_deserialize(&mut src, GameVersion::Ep6).unwrap();
+
+        std::fs::write(
+            "res/skillsout.json",
+            serde_json::to_vec_pretty(&sdata).unwrap(),
+        )
+        .unwrap();
     }
 }

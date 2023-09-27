@@ -10,7 +10,7 @@ path        = "src/lib.rs"
 
 [features]
 default     = ["filestore", "protocol"]
-filestore   = ["dep:memmap2", "dep:kisaseed"]
+filestore   = ["dep:memmap2", "dep:kisaseed", "dep:serde", "dep:serde_json"]
 protocol    = ["dep:aes", "dep:cipher", "dep:ctr", "dep:hmac", "dep:rsa", "dep:sha2"]
 
 [dependencies]
@@ -22,6 +22,8 @@ hmac        = { version = "0.12", optional = true }
 kisaseed    = { version = "0.1.2", optional = true }
 memmap2     = { version = "0.7", optional = true }
 rsa         = { version = "0.9", optional = true }
+serde       = { version = "1.0", features = ["derive"], optional = true }
+serde_json  = { version = "1.0", optional = true }
 sha2        = { version = "0.10", optional = true }
 thiserror   = "1.0"
 tracing     = "0.1"

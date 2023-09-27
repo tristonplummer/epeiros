@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, Serialize};
+use crate::io::{Deserialize, GameVersion, Serialize};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write};
 
@@ -23,7 +23,7 @@ pub enum LoginErrorCode {
 impl Serialize for LoginResponse {
     type Error = std::io::Error;
 
-    fn serialize<T>(&self, dst: &mut T) -> Result<(), Self::Error>
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
     where
         T: Write + WriteBytesExt,
     {
@@ -50,7 +50,7 @@ impl Serialize for LoginResponse {
 impl Deserialize for LoginResponse {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,

@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, ShaiyaReadExt};
+use crate::io::{Deserialize, GameVersion, ShaiyaReadExt};
 
 use byteorder::ReadBytesExt;
 use cipher::BlockDecrypt;
@@ -22,16 +22,14 @@ pub struct SData {
 impl Deserialize for SData {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,
     {
         let mut data = src.consume_all();
         if !is_encrypted(&data) {
-            return Ok(Self {
-                data: data.to_vec(),
-            });
+            return Ok(Self { data });
         }
 
         let _checksum = u32::from_le_bytes(data[40..44].try_into().unwrap());

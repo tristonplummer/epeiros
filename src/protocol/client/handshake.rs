@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, Serialize};
+use crate::io::{Deserialize, GameVersion, Serialize};
 use aes::Aes128;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use cipher::KeyIvInit;
@@ -79,7 +79,7 @@ impl Serialize for LoginHandshakeResponse {
     ///
     /// # Arguments
     /// * `dst` - The destination buffer.
-    fn serialize<T>(&self, dst: &mut T) -> Result<(), Self::Error>
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
     where
         T: Write + WriteBytesExt,
     {
@@ -96,7 +96,7 @@ impl Deserialize for LoginHandshakeResponse {
     ///
     /// # Arguments
     /// * `src` - The source buffer.
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,

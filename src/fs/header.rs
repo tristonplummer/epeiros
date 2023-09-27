@@ -1,4 +1,4 @@
-use crate::io::{Deserialize, ShaiyaReadExt};
+use crate::io::{Deserialize, GameVersion, ShaiyaReadExt};
 use byteorder::ReadBytesExt;
 use std::collections::VecDeque;
 use std::io::{Cursor, Read};
@@ -83,7 +83,7 @@ impl Header {
 impl Deserialize for Header {
     type Error = HeaderDeserializeError;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,
@@ -108,7 +108,7 @@ impl Deserialize for Header {
 impl Deserialize for VirtualDirectory {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,
@@ -135,7 +135,7 @@ impl Deserialize for VirtualDirectory {
 impl Deserialize for Inode {
     type Error = std::io::Error;
 
-    fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
     where
         T: Read + ReadBytesExt,
         Self: Sized,

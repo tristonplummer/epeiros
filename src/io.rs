@@ -1,15 +1,39 @@
+use byteorder::WriteBytesExt;
+
+#[derive(Eq, PartialEq, Ord, PartialOrd, Debug, Copy, Clone)]
+pub enum GameVersion {
+    Ep4,
+    Ep5,
+    Ep6,
+}
+
 pub trait Serialize {
     type Error;
 
     fn serialize<T>(&self, dst: &mut T) -> Result<(), Self::Error>
     where
-        T: std::io::Write + byteorder::WriteBytesExt;
+        T: std::io::Write + WriteBytesExt,
+    {
+        self.versioned_serialize(dst, GameVersion::Ep4)
+    }
+
+    fn versioned_serialize<T>(&self, dst: &mut T, version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: std::io::Write + WriteBytesExt;
 }
 
 pub trait Deserialize {
     type Error;
 
     fn deserialize<T>(src: &mut T) -> Result<Self, Self::Error>
+    where
+        T: std::io::Read + byteorder::ReadBytesExt,
+        Self: Sized,
+    {
+        Self::versioned_deserialize(src, GameVersion::Ep4)
+    }
+
+    fn versioned_deserialize<T>(src: &mut T, version: GameVersion) -> Result<Self, Self::Error>
     where
         T: std::io::Read + byteorder::ReadBytesExt,
         Self: Sized;
@@ -33,6 +57,12 @@ pub trait ShaiyaWriteExt {
     fn write_string<T>(&mut self, text: T, length: usize) -> Result<(), Self::Error>
     where
         T: AsRef<str>;
+
+    fn write_length_prefixed_string<T>(&mut self, text: T) -> Result<(), Self::Error>
+    where
+        T: AsRef<str>;
+
+    fn write_bool(&mut self, value: bool) -> Result<(), Self::Error>;
 }
 
 impl<R> ShaiyaReadExt for R
@@ -80,7 +110,7 @@ where
 
 impl<W> ShaiyaWriteExt for W
 where
-    W: std::io::Write,
+    W: std::io::Write + byteorder::WriteBytesExt,
 {
     type Error = std::io::Error;
 
@@ -88,6 +118,7 @@ where
     where
         T: AsRef<str>,
     {
+        println!("{}", length);
         let mut dst = vec![0; length];
         let bytes = text.as_ref().as_bytes();
         dst[..bytes.len()].copy_from_slice(bytes);
@@ -98,5 +129,21 @@ where
 
         self.write_all(&dst)?;
         Ok(())
+    }
+
+    fn write_length_prefixed_string<T>(&mut self, text: T) -> Result<(), Self::Error>
+    where
+        T: AsRef<str>,
+    {
+        let text = text.as_ref();
+        let length_with_null_terminator = text.bytes().len() + 1;
+
+        self.write_u32::<byteorder::LittleEndian>(length_with_null_terminator as u32)?;
+        self.write_string(text, length_with_null_terminator)?;
+        Ok(())
+    }
+
+    fn write_bool(&mut self, value: bool) -> Result<(), Self::Error> {
+        self.write_u8(if value { 1 } else { 0 })
     }
 }
