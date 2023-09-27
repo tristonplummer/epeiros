@@ -1,0 +1,29 @@
+name: Run linter
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-11, windows-latest ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Build project
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+
+      - name: Run linter over the code
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings

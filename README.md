@@ -12,4 +12,4 @@ Epeiros is available under the terms of the [MIT license][mit]. The full copyrig
 [mit-badge]: https://img.shields.io/badge/license-MIT-informational
 [mit]: https://opensource.org/licenses/MIT
 [build]: https://github.com/openshaiya/epeiros/actions
-[build-badge]: https://github.com/OpenShaiya/epeiros/actions/workflows/test.yml/badge.svg
+[build-badge]: https://github.com/OpenShaiya/epeiros/actions/workflows/build.yml/badge.svg
