@@ -1,5 +1,6 @@
 use crate::fs::header::{Header, HeaderDeserializeError, Inode};
 use crate::io::{Deserialize, GameVersion, Serialize};
+use crc32fast::Hasher;
 use memmap2::Mmap;
 use std::fs::{File, OpenOptions};
 use std::io::{Cursor, Error, Read, Seek, SeekFrom, Write};
@@ -222,10 +223,16 @@ impl WritableStorage for MutableFilestore {
     where
         T: AsRef<str>,
     {
+        let mut hasher = Hasher::new();
+        hasher.update(data);
+        let checksum = hasher.finalize();
+
         if let Some(inode) = self.header.get_inode_mut(&virtual_path) {
             let existing_space = inode.length;
             let can_fit_into_existing_space = data.len() <= existing_space;
             inode.length = data.len();
+            inode.checksum = checksum;
+
             if can_fit_into_existing_space {
                 self.data_file.seek(SeekFrom::Start(inode.offset as u64))?;
 
@@ -249,11 +256,12 @@ impl WritableStorage for MutableFilestore {
         let virtual_path = virtual_path.as_ref();
         let name = virtual_path.split('/').last().unwrap();
         let offset = self.data_file.seek(SeekFrom::End(0))?;
+
         let inode = Inode {
             name: name.to_owned(),
             offset: offset as usize,
             length: data.len(),
-            checksum: 0,
+            checksum,
         };
 
         self.data_file.set_len(offset + (inode.length as u64))?;
@@ -344,8 +352,9 @@ mod tests {
 
     #[test]
     fn patch_test() {
-        let mut fs = ImmutableFilestore::open("res/data.sah", "res/data.saf").unwrap();
-        let mut new = MutableFilestore::create("res/new.sah", "res/new.saf").unwrap();
-        new.patch(&mut fs).unwrap();
+        let mut other = ImmutableFilestore::open("res/data.sah", "res/data.saf").unwrap();
+        let mut fs =
+            MutableFilestore::create("res/new_with_crc.sah", "res/new_with_crc.saf").unwrap();
+        fs.patch(&mut other).unwrap();
     }
 }
