@@ -16,7 +16,7 @@ type Aes128Ctr = Ctr128LE<Aes128>;
 /// The handshake response sent from the client.
 #[derive(Debug, Clone)]
 pub struct LoginHandshakeResponse {
-    payload: Vec<u8>,
+    pub payload: Vec<u8>,
 }
 
 #[derive(Error, Debug)]

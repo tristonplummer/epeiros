@@ -1,7 +1,7 @@
 use crate::io::{Deserialize, Serialize};
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use rsa::traits::PublicKeyParts;
-use rsa::RsaPublicKey;
+use rsa::{BigUint, RsaPublicKey};
 use std::io::{Read, Write};
 
 /// The expected capacity of the exponent. Regardless of the actual size of the exponent, the client
@@ -26,6 +26,19 @@ impl LoginHandshakeRequest {
         let modulus = public_key.n().to_bytes_le();
 
         Self { exponent, modulus }
+    }
+
+    /// Encrypts an input payload with the public key contained
+    /// within this handshake request.
+    ///
+    /// # Arguments
+    /// * `input`   - The payload to encrypt.
+    pub fn encrypt(&self, input: &[u8]) -> Vec<u8> {
+        let input = BigUint::from_bytes_le(input);
+        let e = BigUint::from_bytes_le(&self.exponent);
+        let n = BigUint::from_bytes_le(&self.modulus);
+
+        input.modpow(&e, &n).to_bytes_le()
     }
 }
 

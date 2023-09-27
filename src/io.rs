@@ -34,6 +34,7 @@ pub trait ShaiyaWriteExt {
     where
         T: AsRef<str>;
 }
+
 impl<R> ShaiyaReadExt for R
 where
     R: std::io::Read + byteorder::ReadBytesExt,
