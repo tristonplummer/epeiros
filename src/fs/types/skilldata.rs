@@ -57,7 +57,7 @@ sdata_record!(SkillRecord {
     prerequisite_skill              u16;
     success_type                    u8;
     success_chance                  u8;
-    target_type                     u8;
+    target_type                     TargetType;
     radius                          u8;
     number_of_multi_hits            u8;
     duration                        u16;
@@ -96,6 +96,20 @@ sdata_record!(AbilityRecord {
     ability_type    u8;
     ability_value   u16;
 });
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum TargetType {
+    #[default]
+    CannotBeCasted,
+    None,
+    OnSelf,
+    Enemy,
+    Party,
+    PartyExceptSelf,
+    AroundCaster,
+    AroundTarget,
+    Raid,
+}
 
 impl Deserialize for SkillData {
     type Error = std::io::Error;
@@ -154,6 +168,55 @@ impl Serialize for SkillData {
             }
         }
         Ok(())
+    }
+}
+
+impl Deserialize for TargetType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let target_type = src.read_u8()?;
+        return match target_type {
+            0 => Ok(Self::CannotBeCasted),
+            1 => Ok(Self::None),
+            2 => Ok(Self::OnSelf),
+            3 => Ok(Self::Enemy),
+            4 => Ok(Self::Party),
+            5 => Ok(Self::PartyExceptSelf),
+            6 => Ok(Self::AroundCaster),
+            7 => Ok(Self::AroundTarget),
+            8 => Ok(Self::Raid),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid target type {target_type}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for TargetType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::CannotBeCasted => 0,
+            Self::None => 1,
+            Self::OnSelf => 2,
+            Self::Enemy => 3,
+            Self::Party => 4,
+            Self::PartyExceptSelf => 5,
+            Self::AroundCaster => 6,
+            Self::AroundTarget => 7,
+            Self::Raid => 8,
+        };
+        dst.write_u8(id)
     }
 }
 
