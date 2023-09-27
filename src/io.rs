@@ -123,10 +123,6 @@ where
         let bytes = text.as_ref().as_bytes();
         dst[..bytes.len()].copy_from_slice(bytes);
 
-        if let Some(last) = dst.last_mut() {
-            *last = 0;
-        }
-
         self.write_all(&dst)?;
         Ok(())
     }

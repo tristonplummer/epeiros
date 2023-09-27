@@ -1,11 +1,13 @@
-use crate::io::{Deserialize, GameVersion, ShaiyaReadExt};
-use byteorder::ReadBytesExt;
+use crate::io::{Deserialize, GameVersion, Serialize, ShaiyaReadExt, ShaiyaWriteExt};
+use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::collections::VecDeque;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 use std::path::Path;
 use thiserror::Error;
 
 const SAH_MAGIC_VALUE: &str = "SAH";
+
+const HEADER_FORMAT_VERSION: u32 = 0;
 
 pub struct Header {
     root: VirtualDirectory,
@@ -70,6 +72,40 @@ impl Header {
             if let Some(node) = directory
                 .nodes
                 .iter()
+                .find(|n| n.name.eq_ignore_ascii_case(name))
+            {
+                return Some(node);
+            }
+        }
+
+        None
+    }
+
+    pub fn get_inode_mut<T>(&mut self, virtual_path: T) -> Option<&mut Inode>
+    where
+        T: AsRef<str>,
+    {
+        let virtual_path = virtual_path.as_ref();
+        let mut parts = virtual_path.split('/').collect::<VecDeque<_>>();
+
+        let mut directory = &mut self.root;
+        while parts.len() > 1 {
+            let name = parts.pop_front().expect("failed to pop directory path");
+            match directory
+                .subdirectories
+                .iter_mut()
+                .find(|sub| sub.name.eq_ignore_ascii_case(name))
+            {
+                Some(sub) => directory = sub,
+                None => return None,
+            }
+        }
+
+        if parts.len() == 1 {
+            let name = parts.pop_front().expect("failed to pop node path");
+            if let Some(node) = directory
+                .nodes
+                .iter_mut()
                 .find(|n| n.name.eq_ignore_ascii_case(name))
             {
                 return Some(node);
@@ -151,5 +187,60 @@ impl Deserialize for Inode {
             length,
             checksum,
         })
+    }
+}
+
+impl Serialize for Header {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        dst.write_string(SAH_MAGIC_VALUE, 3)?;
+        dst.write_u32::<byteorder::LittleEndian>(HEADER_FORMAT_VERSION)?;
+        dst.write_u32::<byteorder::LittleEndian>(10)?;
+        let padding = vec![0; 40];
+        dst.write(&padding)?;
+        self.root.versioned_serialize(dst, version)?;
+        dst.write_u64::<byteorder::LittleEndian>(0)?;
+        Ok(())
+    }
+}
+
+impl Serialize for VirtualDirectory {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        dst.write_length_prefixed_string(&self.name)?;
+
+        dst.write_u32::<byteorder::LittleEndian>(self.nodes.len() as u32)?;
+        for node in &self.nodes {
+            node.versioned_serialize(dst, version)?;
+        }
+
+        dst.write_u32::<byteorder::LittleEndian>(self.subdirectories.len() as u32)?;
+        for subdir in &self.subdirectories {
+            subdir.versioned_serialize(dst, version)?;
+        }
+        Ok(())
+    }
+}
+
+impl Serialize for Inode {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        dst.write_length_prefixed_string(&self.name)?;
+        dst.write_u64::<byteorder::LittleEndian>(self.offset as u64)?;
+        dst.write_u32::<byteorder::LittleEndian>(self.length as u32)?;
+        dst.write_u32::<byteorder::LittleEndian>(self.checksum)?;
+        Ok(())
     }
 }
