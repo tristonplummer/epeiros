@@ -22,7 +22,6 @@ pub enum GameMode {
 
 #[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
 pub enum PermittedRace {
-    #[default]
     Human,
     Elf,
     AllLight,
@@ -30,6 +29,18 @@ pub enum PermittedRace {
     Vail,
     AllFury,
     AllFactions,
+    #[default]
+    None,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum ElementType {
+    #[default]
+    None,
+    Fire(u8),
+    Water(u8),
+    Earth(u8),
+    Wind(u8),
 }
 
 impl Deserialize for GameMode {
@@ -88,6 +99,7 @@ impl Deserialize for PermittedRace {
             4 => Ok(Self::Vail),
             5 => Ok(Self::AllFury),
             6 => Ok(Self::AllFactions),
+            7 => Ok(Self::None),
             _ => Err(std::io::Error::new(
                 ErrorKind::InvalidInput,
                 format!("invalid permitted race {permitted}"),
@@ -111,6 +123,51 @@ impl Serialize for PermittedRace {
             Self::Vail => 4,
             Self::AllFury => 5,
             Self::AllFactions => 6,
+            Self::None => 7,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for ElementType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let element_type = src.read_u8()?;
+        let element_id = element_type % 4;
+        let element_level = element_type / 4 + 1;
+
+        return match element_id {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Fire(element_level)),
+            2 => Ok(Self::Water(element_level)),
+            3 => Ok(Self::Earth(element_level)),
+            4 => Ok(Self::Wind(element_level)),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid element type {element_type}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for ElementType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::None => 0,
+            Self::Fire(level) => ((level - 1) * 4) + 1,
+            Self::Water(level) => ((level - 1) * 4) + 2,
+            Self::Earth(level) => ((level - 1) * 4) + 3,
+            Self::Wind(level) => ((level - 1) * 4) + 4,
         };
         dst.write_u8(id)
     }

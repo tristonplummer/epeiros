@@ -14,7 +14,7 @@ sdata_record!(SkillRecord {
     icon                            u16;
     animation                       u16;
     effect                          u8          if(ep6_or_above);
-    toggle_type                     u8;
+    can_be_toggled                  bool;
     sound                           u16;
     min_level                       u16;
     permitted_races                 PermittedRace;
@@ -26,7 +26,7 @@ sdata_record!(SkillRecord {
     usable_by_priest                bool;
     min_game_mode                   GameMode;
     skill_point_cost                u8;
-    category                        u8;
+    category                        SkillCategory;
     type_attack                     u8;
     type_effect                     u8;
     type_detail                     u16;
@@ -52,7 +52,7 @@ sdata_record!(SkillRecord {
     cooldown_duration               u16;
     attack_distance                 u8;
     state_type                      u8;
-    element_type                    u8;
+    element                         ElementType;
     disable                         u16;
     prerequisite_skill              u16;
     success_type                    u8;
@@ -66,11 +66,11 @@ sdata_record!(SkillRecord {
     weapon_value                    u8;
     bag                             u8;
     arrow                           u16;
-    damage_type                     u8;
-    fixed_damage_hp                 u16;
-    fixed_damage_sp                 u16;
-    fixed_damage_mp                 u16;
-    damage_over_time_type           u8;
+    damage_type                     DamageType;
+    damage_hp                       u16;
+    damage_sp                       u16;
+    damage_mp                       u16;
+    damage_over_time_type           DamageOverTimeType;
     damage_over_time_hp             u16;
     damage_over_time_sp             u16;
     damage_over_time_mp             u16;
@@ -87,7 +87,7 @@ sdata_record!(SkillRecord {
     damage_avoid_type               u8;
     damage_avoid_value              u8;
     hp_trigger_threshold            u8;
-    duration_type                   u8;
+    duration_type                   DurationType;
     change_type                     u16;
     change_value                    u16;
 });
@@ -109,6 +109,47 @@ pub enum TargetType {
     AroundCaster,
     AroundTarget,
     Raid,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum SkillCategory {
+    #[default]
+    None,
+    Passive,
+    Basic,
+    Combat,
+    Special,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum DamageType {
+    #[default]
+    NotUsed,
+    Fixed,
+    PlusAdditional,
+    Coefficient,
+    CasterCurrentHitpoints,
+    TargetManaPercent,
+    TargetHitpointsPercent,
+    RecCoefficient,
+    RecPlusAdditional,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum DamageOverTimeType {
+    #[default]
+    None,
+    Percent,
+    Exponential,
+}
+
+#[derive(Default, PartialEq, Debug, serde::Deserialize, serde::Serialize)]
+pub enum DurationType {
+    #[default]
+    None,
+    SecondsAndDisappearOnDeath,
+    HoursAndPersistsOnDeath,
+    SecondsAndPersistsOnDeath,
 }
 
 impl Deserialize for SkillData {
@@ -215,6 +256,168 @@ impl Serialize for TargetType {
             Self::AroundCaster => 6,
             Self::AroundTarget => 7,
             Self::Raid => 8,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for SkillCategory {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let category = src.read_u8()?;
+        return match category {
+            0 => Ok(Self::None),
+            1 => Ok(Self::Passive),
+            2 => Ok(Self::Basic),
+            3 => Ok(Self::Combat),
+            4 => Ok(Self::Special),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid category {category}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for SkillCategory {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::None => 0,
+            Self::Passive => 1,
+            Self::Basic => 2,
+            Self::Combat => 3,
+            Self::Special => 4,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for DamageType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let damage_type = src.read_u8()?;
+        return match damage_type {
+            0 => Ok(Self::Fixed),
+            1 => Ok(Self::PlusAdditional),
+            2 => Ok(Self::Coefficient),
+            3 => Ok(Self::CasterCurrentHitpoints),
+            4 => Ok(Self::TargetManaPercent),
+            5 => Ok(Self::TargetHitpointsPercent),
+            6 => Ok(Self::RecCoefficient),
+            7 => Ok(Self::RecPlusAdditional),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid damage type {damage_type}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for DamageType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::NotUsed | Self::Fixed => 0,
+            Self::PlusAdditional => 1,
+            Self::Coefficient => 2,
+            Self::CasterCurrentHitpoints => 3,
+            Self::TargetManaPercent => 4,
+            Self::TargetHitpointsPercent => 5,
+            Self::RecCoefficient => 6,
+            Self::RecPlusAdditional => 7,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for DamageOverTimeType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let dot_type = src.read_u8()?;
+        return match dot_type {
+            0 => Ok(Self::None),
+            4 => Ok(Self::Percent),
+            12 => Ok(Self::Exponential),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid damage over time type {dot_type}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for DamageOverTimeType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::None => 0,
+            Self::Percent => 4,
+            Self::Exponential => 8,
+        };
+        dst.write_u8(id)
+    }
+}
+
+impl Deserialize for DurationType {
+    type Error = std::io::Error;
+
+    fn versioned_deserialize<T>(src: &mut T, _version: GameVersion) -> Result<Self, Self::Error>
+    where
+        T: Read + ReadBytesExt,
+        Self: Sized,
+    {
+        let duration_type = src.read_u8()?;
+        return match duration_type {
+            0 => Ok(Self::SecondsAndDisappearOnDeath),
+            1 => Ok(Self::HoursAndPersistsOnDeath),
+            2 => Ok(Self::SecondsAndPersistsOnDeath),
+            _ => Err(std::io::Error::new(
+                ErrorKind::InvalidInput,
+                format!("invalid duration type {duration_type}"),
+            )),
+        };
+    }
+}
+
+impl Serialize for DurationType {
+    type Error = std::io::Error;
+
+    fn versioned_serialize<T>(&self, dst: &mut T, _version: GameVersion) -> Result<(), Self::Error>
+    where
+        T: Write + WriteBytesExt,
+    {
+        let id = match *self {
+            Self::None | Self::SecondsAndDisappearOnDeath => 0,
+            Self::HoursAndPersistsOnDeath => 1,
+            Self::SecondsAndPersistsOnDeath => 2,
         };
         dst.write_u8(id)
     }

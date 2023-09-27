@@ -89,11 +89,11 @@ macro_rules! user_type_readable {
         $src.read_u8()?
     };
     ($src:ident, $version:ident, bool) => {
-        1 == $src.read_u8()?
+        1 >= $src.read_u8()?
     };
     ($src:ident, $version:ident, bool, $if:expr) => {
         if $if($version) {
-            1 == $src.read_u8()?
+            1 >= $src.read_u8()?
         } else {
             false
         }

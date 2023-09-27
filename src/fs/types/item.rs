@@ -37,7 +37,7 @@ sdata_record!(ItemRecord {
     req_ig              u8;
     range               u16;
     attack_time         u8;
-    attrib              u8;
+    element             ElementType;
     special             u8;
     slot                u8;
     quality             u16;
